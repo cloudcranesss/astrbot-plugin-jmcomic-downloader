@@ -9,22 +9,28 @@ from astrbot.api.star import Context, Star, register
 from pathlib import Path
 from tenacity import stop_after_attempt, wait_exponential, retry
 
-@register("禁漫天堂漫画下载器", "cloudcranesss", "发送本子id即可获取pdf", "1.0.0", "https://github.com/cloudcranesss/astrbot-plugin-jmcomic-downloader")
-class jmcomic_download(Star):
+
+@register("禁漫天堂漫画下载器", "cloudcranesss", "发送对应漫画id即可实现下载本子pdf", "1.0.0")
+class JmComicDownloader(Star):
     MAX_RETRY_ATTEMPTS = 3
     WAIT_EXPONENTIAL_MAX = 10
     FILE_TIMEOUT = 30  # 秒
     ALBUM_ID_REGEX = r"^jm(\d+)$"
     PDF_SUFFIX = ".pdf"
 
-    def __init__(self, context: Context, config):
+    def __init__(self, context: Context):
         super().__init__(context)
-        self.config = config
-        self.base_dir = Path(self.config.get("jm_download_dir", "./data/plugins/astrbot-plugin-jmcomic-downloader/downloads")).resolve()
-        self.pdf_dir = Path(self.config.get("jm_pdf_dir", "./data/plugins/astrbot-plugin-jmcomic-downloader/pdf")).resolve()
+        self.config = context.config
+        self.base_dir = Path(self.config.get("jm_download_dir", "/data/downloads")).resolve()
+        self.pdf_dir = Path(self.config.get("jm_pdf_dir", "/data/pdf")).resolve()
         self.username = self.config.get("jm_username", "")
         self.password = self.config.get("jm_password", "")
-        self._option_file = Path(__file__).parent / "option.yml"
+
+        # 获取插件目录
+        plugin_dir = Path(self.context.plugin_info["directory"])
+        self._option_file = plugin_dir / "option.yml"
+
+        # 确保目录存在
         self._ensure_directories()
         logger.info("插件初始化完成")
 
@@ -33,7 +39,9 @@ class jmcomic_download(Star):
         try:
             for directory in [self.base_dir, self.pdf_dir]:
                 directory.mkdir(parents=True, exist_ok=True)
-                (directory / ".permission_test").touch()
+                test_file = directory / ".permission_test"
+                test_file.touch()
+                test_file.unlink()
                 logger.debug(f"目录权限验证通过: {directory}")
         except PermissionError:
             logger.critical(f"目录权限不足: {directory}")
@@ -99,7 +107,8 @@ plugins:
         # 等待文件生成（带超时）
         start_time = time.time()
         while not expected_pdf.exists():
-            if time.time() - start_time > self.FILE_TIMEOUT:
+            elapsed = time.time() - start_time
+            if elapsed > self.FILE_TIMEOUT:
                 raise TimeoutError(f"文件生成超时: {expected_pdf}")
             await asyncio.sleep(1)
 
@@ -113,8 +122,13 @@ plugins:
     @filter.regex(ALBUM_ID_REGEX, flags=re.IGNORECASE)
     async def handle_album_id(self, event: AstrMessageEvent):
         """处理用户输入的专辑ID"""
-        album_id = event.get_messages()[0]
-        album_id = str(album_id)
+        # 提取匹配的数字部分
+        messages = event.get_messages()
+        album_id = str(messages[0])
+        if not album_id:
+            yield event.plain_result("请输入有效的本子ID，例如: jm123456")
+            return
+
         if not self._validate_album_id(album_id):
             yield event.plain_result("请输入有效的本子ID，例如: jm123456")
             return
@@ -125,13 +139,11 @@ plugins:
 
             # 执行下载
             pdf_file = await self._download_album(album_id)
-            pdf_file = pdf_file.name
-            logger.info(f"PDF文件保存在: {pdf_file}")
 
             # 发送文件
             chain = [
                 Comp.Plain(f"处理完成：jm{album_id}"),
-                Comp.File(file=pdf_file, name=f"jm{album_id}{self.PDF_SUFFIX}"),
+                Comp.File(file=f"{self.pdf_dir}/{album_id}{self.PDF_SUFFIX}", name=f"jm{album_id}{self.PDF_SUFFIX}"),
             ]
             yield event.chain_result(chain)
 
