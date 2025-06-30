@@ -76,7 +76,7 @@ plugins:
 
     @retry(stop=stop_after_attempt(MAX_RETRY_ATTEMPTS),
            wait=wait_exponential(multiplier=1, max=WAIT_EXPONENTIAL_MAX))
-    async def _download_album(self, album_id: str) -> None:
+    async def _download_album(self, album_id: str) -> Path:
         """下载专辑并返回PDF路径"""
         logger.info(f"开始下载: jm{album_id}")
         self._create_option_file()
@@ -87,13 +87,14 @@ plugins:
         # 检查是否已有缓存
         if expected_pdf.exists():
             logger.info(f"使用缓存文件: {expected_pdf}")
+            return expected_pdf
 
         # 启动下载（同步函数放入线程池执行）
         await asyncio.to_thread(
             jmcomic.download_album,
             f"jm{album_id}",
             jmcomic.create_option_by_file(str(self._option_file))
-         )
+        )
 
         # 等待文件生成（带超时）
         start_time = time.time()
@@ -103,32 +104,36 @@ plugins:
             await asyncio.sleep(1)
 
         logger.info(f"下载完成: {expected_pdf}")
+        return expected_pdf
 
     def _validate_album_id(self, album_id: str) -> bool:
         """验证专辑ID格式有效性"""
         return bool(re.match(self.ALBUM_ID_REGEX, f"jm{album_id}")) and len(album_id) <= 8
 
     @filter.regex(ALBUM_ID_REGEX, flags=re.IGNORECASE)
-    async def handle_album_id(self, event: AstrMessageEvent, PDF_SUFFIX=None):
+    async def handle_album_id(self, event: AstrMessageEvent):
         """处理用户输入的专辑ID"""
         album_id = event.get_messages()[0]
         album_id = str(album_id)
         if not self._validate_album_id(album_id):
             yield event.plain_result("请输入有效的本子ID，例如: jm123456")
+            return
 
         try:
             # 发送确认消息
             yield event.plain_result(f"开始处理 jm{album_id}，请稍候...")
 
             # 执行下载
-            await self._download_album(album_id)
-            pdf_dir = f"{self.pdf_dir}/{album_id}{PDF_SUFFIX}"
+            pdf_file = await self._download_album(album_id)
+            pdf_file = pdf_file.name
+            logger.info(f"PDF文件保存在: {pdf_file}")
 
             # 发送文件
             chain = [
-                Comp.Plain(f"开始处理 jm{album_id}，请稍候..."),
-                Comp.File(file=pdf_dir, name=f"jm{album_id}.pdf"),
+                Comp.Plain(f"处理完成：jm{album_id}"),
+                Comp.File(file=pdf_file, name=f"jm{album_id}{self.PDF_SUFFIX}"),
             ]
+            yield event.chain_result(chain)
 
         except TimeoutError as e:
             logger.error(str(e))
