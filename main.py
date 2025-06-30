@@ -122,16 +122,8 @@ plugins:
     async def handle_album_id(self, event: AstrMessageEvent):
         """处理用户输入的专辑ID"""
         # 从消息中提取数字部分
-        message = event.message_str.strip().lower()
-
-        # 尝试提取数字ID
-        match = re.search(r"jm(\d+)", message)
-        if match:
-            album_id = match.group(1)
-        else:
-            # 作为备选方案，尝试提取纯数字
-            album_id = re.sub(r"\D", "", message)
-
+        message = event.get_messages()
+        album_id = str(message[0])
         # 验证ID格式
         if not album_id or not self._validate_album_id(album_id):
             yield event.plain_result("请输入有效的本子ID，例如: jm123456")
