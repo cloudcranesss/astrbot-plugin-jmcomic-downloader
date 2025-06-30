@@ -1,0 +1,26 @@
+{
+  "jm_username": {
+    "description": "18comic 用户名",
+    "type": "string",
+    "hint": "可选项",
+    "default": ""
+  },
+  "jm_password": {
+    "description": "18comic 密码",
+    "type": "string",
+    "hint": "可选项",
+    "default": ""
+  },
+  "jm_download_dir": {
+    "description": "本子下载路径",
+    "type": "string",
+    "hint": "可选项。默认：./data/plugins/astrbot-plugin-jmcomic-downloader/downloads",
+    "default": "./data/plugins/astrbot-plugin-jmcomic-downloader/downloads"
+  },
+  "jm_pdf_dir": {
+    "description": "PDF 文件路径",
+    "type": "string",
+    "hint": "可选项。默认：./data/plugins/astrbot-plugin-jmcomic-downloader/pdf",
+    "default": "./data/plugins/astrbot-plugin-jmcomic-downloader/pdf"
+  }
+}

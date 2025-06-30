@@ -1,0 +1,5 @@
+name: astrbot-plugin-jmcomic-downloader
+desc: 禁漫天堂漫画下载器
+version: 1.0.0
+author: cloudcranesss
+repo: https://github.com/cloudcranesss/astrbot-plugin-jmcomic-downloader
