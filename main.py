@@ -22,11 +22,11 @@ class JmComicDownloader(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
         self.config = config
-        self.base_dir = Path(self.config.get("jm_download_dir", "./data/plugins/astrbot-plugin-jmcomic-downloader/downloads")).resolve()
-        self.pdf_dir = Path(self.config.get("jm_pdf_dir", "./data/plugins/astrbot-plugin-jmcomic-downloader/pdf")).resolve()
+        self.base_dir = Path(self.config.get("jm_download_dir", "./data/plugins/astrbot_plugin_jmcomic_downloader/downloads")).resolve()
+        self.pdf_dir = Path(self.config.get("jm_pdf_dir", "./data/plugins/astrbot_plugin_jmcomic_downloader/pdf")).resolve()
         self.username = self.config.get("jm_username", "")
         self.password = self.config.get("jm_password", "")
-        self._option_file = Path.cwd() / "option.yml"
+        self._option_file = "./data/plugins/astrbot_plugin_jmcomic_downloader/option.yml"
 
         # 确保目录存在
         self._ensure_directories()
