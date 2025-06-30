@@ -7,6 +7,7 @@ from astrbot.api import logger
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from pathlib import Path
+from astrbot.core import AstrBotConfig
 from tenacity import stop_after_attempt, wait_exponential, retry
 
 
@@ -18,17 +19,14 @@ class JmComicDownloader(Star):
     ALBUM_ID_REGEX = r"^jm(\d+)$"
     PDF_SUFFIX = ".pdf"
 
-    def __init__(self, context: Context):
+    def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
-        self.config = context.config
+        self.config = config
         self.base_dir = Path(self.config.get("jm_download_dir", "/data/downloads")).resolve()
         self.pdf_dir = Path(self.config.get("jm_pdf_dir", "/data/pdf")).resolve()
         self.username = self.config.get("jm_username", "")
         self.password = self.config.get("jm_password", "")
-
-        # 获取插件目录
-        plugin_dir = Path(self.context.plugin_info["directory"])
-        self._option_file = plugin_dir / "option.yml"
+        self._option_file = Path.cwd() / "option.yml"
 
         # 确保目录存在
         self._ensure_directories()
@@ -117,19 +115,25 @@ plugins:
 
     def _validate_album_id(self, album_id: str) -> bool:
         """验证专辑ID格式有效性"""
-        return bool(re.match(self.ALBUM_ID_REGEX, f"jm{album_id}")) and len(album_id) <= 8
+        # 检查长度在合理范围（1-10位数字）
+        return album_id.isdigit() and 1 <= len(album_id) <= 10
 
-    @filter.regex(ALBUM_ID_REGEX, flags=re.IGNORECASE)
+    @filter.regex(r"jm\d+", flags=re.IGNORECASE)
     async def handle_album_id(self, event: AstrMessageEvent):
         """处理用户输入的专辑ID"""
-        # 提取匹配的数字部分
-        messages = event.get_messages()
-        album_id = str(messages[0])
-        if not album_id:
-            yield event.plain_result("请输入有效的本子ID，例如: jm123456")
-            return
+        # 从消息中提取数字部分
+        message = event.message_str.strip().lower()
 
-        if not self._validate_album_id(album_id):
+        # 尝试提取数字ID
+        match = re.search(r"jm(\d+)", message)
+        if match:
+            album_id = match.group(1)
+        else:
+            # 作为备选方案，尝试提取纯数字
+            album_id = re.sub(r"\D", "", message)
+
+        # 验证ID格式
+        if not album_id or not self._validate_album_id(album_id):
             yield event.plain_result("请输入有效的本子ID，例如: jm123456")
             return
 
@@ -141,11 +145,11 @@ plugins:
             pdf_file = await self._download_album(album_id)
 
             # 发送文件
-            chain = [
+            file_comp = Comp.File(file=str(pdf_file), name=f"jm{album_id}{self.PDF_SUFFIX}")
+            yield event.chain_result([
                 Comp.Plain(f"处理完成：jm{album_id}"),
-                Comp.File(file=f"{self.pdf_dir}/{album_id}{self.PDF_SUFFIX}", name=f"jm{album_id}{self.PDF_SUFFIX}"),
-            ]
-            yield event.chain_result(chain)
+                file_comp
+            ])
 
         except TimeoutError as e:
             logger.error(str(e))
