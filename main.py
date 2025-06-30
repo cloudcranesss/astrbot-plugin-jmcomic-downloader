@@ -9,7 +9,7 @@ from astrbot.api.star import Context, Star, register
 from pathlib import Path
 from tenacity import stop_after_attempt, wait_exponential, retry
 
-
+@register("禁漫天堂漫画下载器", "cloudcranesss", "发送本子id即可获取pdf", "1.0.0", "https://github.com/cloudcranesss/astrbot-plugin-jmcomic-downloader")
 class jmcomic_download(Star):
     MAX_RETRY_ATTEMPTS = 3
     WAIT_EXPONENTIAL_MAX = 10
@@ -20,8 +20,8 @@ class jmcomic_download(Star):
     def __init__(self, context: Context, config):
         super().__init__(context)
         self.config = config
-        self.base_dir = Path(self.config.get("jm_download_dir", "/data/downloads")).resolve()
-        self.pdf_dir = Path(self.config.get("jm_pdf_dir", "/data/pdf")).resolve()
+        self.base_dir = Path(self.config.get("jm_download_dir", "./data/plugins/astrbot-plugin-jmcomic-downloader/downloads")).resolve()
+        self.pdf_dir = Path(self.config.get("jm_pdf_dir", "./data/plugins/astrbot-plugin-jmcomic-downloader/pdf")).resolve()
         self.username = self.config.get("jm_username", "")
         self.password = self.config.get("jm_password", "")
         self._option_file = Path(__file__).parent / "option.yml"
